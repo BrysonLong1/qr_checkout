@@ -8,13 +8,20 @@ from datetime import datetime
 from forms import LoginForm, RegisterForm
 from models import db, User
 
+<<<<<<< HEAD
 # Load environment variables from .env file
+=======
+>>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
 load_dotenv()
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
 
+<<<<<<< HEAD
 # Initialize extensions
+=======
+# Init plugins
+>>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
 db.init_app(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
@@ -33,7 +40,11 @@ def register():
         if existing_user:
             flash('Email already registered')
             return redirect(url_for('register'))
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
         hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         new_user = User(email=form.email.data, password=hashed_pw)
         db.session.add(new_user)
@@ -54,6 +65,10 @@ def login():
             flash('Invalid email or password.')
     return render_template('login.html', form=form)
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
 @app.route('/logout')
 @login_required
 def logout():
@@ -114,6 +129,7 @@ def index():
 
     return render_template('index.html', drinks=DRINKS, service_fee=SERVICE_FEE)
 
+<<<<<<< HEAD
 @app.route('/success')
 @login_required
 def success():
@@ -124,3 +140,9 @@ def success():
 # Start the Flask app
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+=======
+
+@app.route('/_debug')
+def debug_check():
+    return "✔ Running correct app.py from VS Code"
+>>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
