@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scan to Pay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #fff8f0;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        h2 {
+            color: #ff6600;
+            margin-bottom: 20px;
+        }
+
+        .qr-container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        img {
+            width: 300px;
+            height: 300px;
+        }
+
+        p {
+            font-size: 16px;
+            margin-top: 15px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="qr-container">
+        <h2>Scan to Pay</h2>
+        <img src="data:image/png;base64,{{ img_data }}" alt="QR Code">
+        <p>Use your phone camera to scan the code and complete your purchase.</p>
+    </div>
+</body>
+</html>

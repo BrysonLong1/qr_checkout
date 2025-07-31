@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select a Drink</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #000;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        img {
+            width: 300px;
+            max-width: 90vw;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+            font-size: 26px;
+        }
+
+        select, input[type="email"], input[type="password"] {
+            font-size: 16px;
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            margin: 10px 0;
+            width: 240px;
+        }
+
+        button {
+            padding: 12px 40px;
+            font-size: 16px;
+            background: linear-gradient(to right, orange, deeppink);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 240px;
+        }
+    </style>
+</head>
+<body>
+    <img src="{{ url_for('static', filename='fxbgnew.png') }}" alt="FXBG Summers Logo">
+    <h2>Select Your Drink</h2>
+    <form method="POST">
+        <input type="email" name="email" placeholder="Your Email" required>
+        <input type="password" name="password" placeholder="Password" required>
+
+        <select name="drink" required>
+            {% for name in drinks %}
+                <option value="{{ name }}">{{ name }} - ${{ drinks[name] }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="tip" required>
+            <option value="0">No Tip</option>
+            <option value="0.15">15% Tip</option>
+            <option value="0.20">20% Tip</option>
+            <option value="0.30">30% Tip</option>
+        </select>
+
+        <button type="submit">Generate QR Code</button>
+    </form>
+</body>
+</html>

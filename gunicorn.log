@@ -1,0 +1,129 @@
+nohup: ignoring input
+[2025-07-30 00:38:35 +0000] [11726] [INFO] Starting gunicorn 23.0.0
+[2025-07-30 00:38:35 +0000] [11726] [INFO] Listening at: http://0.0.0.0:5000 (11726)
+[2025-07-30 00:38:35 +0000] [11726] [INFO] Using worker: sync
+[2025-07-30 00:38:35 +0000] [11727] [INFO] Booting worker with pid: 11727
+[2025-07-30 00:42:43 +0000] [11726] [CRITICAL] WORKER TIMEOUT (pid:11727)
+[2025-07-30 00:42:43 +0000] [11727] [ERROR] Error handling request (no URI read)
+Traceback (most recent call last):
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/sync.py", line 133, in handle
+    req = next(parser)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/parser.py", line 41, in __next__
+    self.mesg = self.mesg_class(self.cfg, self.unreader, self.source_addr, self.req_count)
+                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 259, in __init__
+    super().__init__(cfg, unreader, peer_addr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 60, in __init__
+    unused = self.parse(self.unreader)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 271, in parse
+    self.get_data(unreader, buf, stop=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 262, in get_data
+    data = unreader.read()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 36, in read
+    d = self.chunk()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 63, in chunk
+    return self.sock.recv(self.mxchunk)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/base.py", line 204, in handle_abort
+    sys.exit(1)
+    ~~~~~~~~^^^
+SystemExit: 1
+[2025-07-30 00:42:43 +0000] [11727] [INFO] Worker exiting (pid: 11727)
+[2025-07-30 00:42:43 +0000] [11735] [INFO] Booting worker with pid: 11735
+[2025-07-30 02:29:04 +0000] [11726] [INFO] Handling signal: hup
+[2025-07-30 02:29:04 +0000] [11726] [INFO] Hang up: Master
+[2025-07-30 02:29:04 +0000] [12966] [INFO] Booting worker with pid: 12966
+[2025-07-30 02:29:04 +0000] [11726] [ERROR] Worker (pid:11735) was sent SIGHUP!
+[2025-07-30 19:21:54 +0000] [12966] [WARNING] Invalid request from ip=167.94.145.97: Invalid HTTP Version: (2, 0)
+[2025-07-30 19:21:59 +0000] [12966] [WARNING] Invalid request from ip=167.94.145.97: Invalid HTTP Version: (2, 0)
+[2025-07-30 22:28:01 +0000] [11726] [CRITICAL] WORKER TIMEOUT (pid:12966)
+[2025-07-30 22:28:01 +0000] [12966] [ERROR] Error handling request (no URI read)
+Traceback (most recent call last):
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/sync.py", line 133, in handle
+    req = next(parser)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/parser.py", line 41, in __next__
+    self.mesg = self.mesg_class(self.cfg, self.unreader, self.source_addr, self.req_count)
+                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 259, in __init__
+    super().__init__(cfg, unreader, peer_addr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 60, in __init__
+    unused = self.parse(self.unreader)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 271, in parse
+    self.get_data(unreader, buf, stop=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 262, in get_data
+    data = unreader.read()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 36, in read
+    d = self.chunk()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 63, in chunk
+    return self.sock.recv(self.mxchunk)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/base.py", line 204, in handle_abort
+    sys.exit(1)
+    ~~~~~~~~^^^
+SystemExit: 1
+[2025-07-30 22:28:01 +0000] [12966] [INFO] Worker exiting (pid: 12966)
+[2025-07-30 22:28:02 +0000] [22656] [INFO] Booting worker with pid: 22656
+[2025-07-31 00:33:41 +0000] [22656] [WARNING] Invalid request from ip=3.130.96.91: Invalid HTTP request line: 'SSH-2.0-Go'
+[2025-07-31 02:01:32 +0000] [22656] [WARNING] Invalid request from ip=3.130.96.91: Invalid HTTP request line: 'SSH-2.0-Go'
+[2025-07-31 13:57:01 +0000] [11726] [CRITICAL] WORKER TIMEOUT (pid:22656)
+[2025-07-31 13:57:01 +0000] [22656] [ERROR] Error handling request (no URI read)
+Traceback (most recent call last):
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/sync.py", line 133, in handle
+    req = next(parser)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/parser.py", line 41, in __next__
+    self.mesg = self.mesg_class(self.cfg, self.unreader, self.source_addr, self.req_count)
+                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 259, in __init__
+    super().__init__(cfg, unreader, peer_addr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 60, in __init__
+    unused = self.parse(self.unreader)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 271, in parse
+    self.get_data(unreader, buf, stop=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 262, in get_data
+    data = unreader.read()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 36, in read
+    d = self.chunk()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 63, in chunk
+    return self.sock.recv(self.mxchunk)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/base.py", line 204, in handle_abort
+    sys.exit(1)
+    ~~~~~~~~^^^
+SystemExit: 1
+[2025-07-31 13:57:01 +0000] [22656] [INFO] Worker exiting (pid: 22656)
+[2025-07-31 13:57:01 +0000] [42374] [INFO] Booting worker with pid: 42374
+[2025-07-31 14:50:15 +0000] [11726] [CRITICAL] WORKER TIMEOUT (pid:42374)
+[2025-07-31 14:50:15 +0000] [42374] [ERROR] Error handling request (no URI read)
+Traceback (most recent call last):
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/sync.py", line 133, in handle
+    req = next(parser)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/parser.py", line 41, in __next__
+    self.mesg = self.mesg_class(self.cfg, self.unreader, self.source_addr, self.req_count)
+                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 259, in __init__
+    super().__init__(cfg, unreader, peer_addr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 60, in __init__
+    unused = self.parse(self.unreader)
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 271, in parse
+    self.get_data(unreader, buf, stop=True)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/message.py", line 262, in get_data
+    data = unreader.read()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 36, in read
+    d = self.chunk()
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/http/unreader.py", line 63, in chunk
+    return self.sock.recv(self.mxchunk)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/root/qr_checkout/venv/lib/python3.13/site-packages/gunicorn/workers/base.py", line 204, in handle_abort
+    sys.exit(1)
+    ~~~~~~~~^^^
+SystemExit: 1
+[2025-07-31 14:50:15 +0000] [42374] [INFO] Worker exiting (pid: 42374)
+[2025-07-31 14:50:16 +0000] [44162] [INFO] Booting worker with pid: 44162
