@@ -15,36 +15,62 @@
             flex-direction: column;
             text-align: center;
         }
-
         h2 {
             color: #ff6600;
             margin-bottom: 20px;
         }
-
         .qr-container {
             background: #ffffff;
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 420px;
         }
-
         img {
             width: 300px;
             height: 300px;
         }
-
         p {
             font-size: 16px;
-            margin-top: 15px;
+            margin-top: 12px;
             color: #555;
+        }
+        .meta {
+            margin-bottom: 12px;
+        }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #ff6600;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .back-button:hover {
+            background-color: #e65c00;
         }
     </style>
 </head>
 <body>
     <div class="qr-container">
         <h2>Scan to Pay</h2>
+
+        <!-- Ticket meta pulled from app.py -->
+        {% if ticket_name %}
+          <div class="meta">
+            <strong>{{ ticket_name }}</strong>
+            {% if total_price is not none %}
+              <div>Total: ${{ '%.2f' % total_price }}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+
         <img src="data:image/png;base64,{{ img_data }}" alt="QR Code">
+
         <p>Use your phone camera to scan the code and complete your purchase.</p>
+        <a href="{{ url_for('index') }}" class="back-button">← Back</a>
     </div>
 </body>
 </html>

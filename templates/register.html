@@ -1,26 +1,48 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Create Account</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .error { color: red; }
-        .success { color: green; }
-        .message { margin-top: 10px; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div class="container">
-        <h2>Create Account</h2>
-        <form method="POST" id="registerForm">
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" id="password" placeholder="Password" required>
-            <input type="password" name="confirm_password" id="confirm_password" placeholder="Confirm Password" required>
-            <button type="submit">Create Account</button>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md p-8 bg-white rounded-xl shadow-md space-y-6">
+        <h2 class="text-2xl font-bold text-center text-gray-800">Create Account</h2>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="space-y-2">
+                    {% for message in messages %}
+                        <p class="text-red-500 text-sm text-center">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" id="registerForm" class="space-y-4">
+            {{ form.hidden_tag() }}
+
+            <input type="email" name="email" placeholder="Email"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+
+            <input type="password" name="password" id="password" placeholder="Password"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+
+            <input type="password" name="confirm" id="confirm_password" placeholder="Confirm Password"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+
+            <button type="submit"
+                    class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">
+                Create Account
+            </button>
         </form>
-        <p class="message" id="feedback"></p>
+
+        <p class="text-sm text-center mt-2" id="feedback"></p>
+
+        <p class="text-sm text-center mt-4 text-gray-600">
+            Already have an account? <a href="{{ url_for('login') }}" class="text-blue-600 hover:underline">Login</a>
+        </p>
     </div>
 
     <script>
@@ -32,57 +54,13 @@
         form.addEventListener("submit", function (e) {
             if (password.value !== confirmPassword.value) {
                 e.preventDefault();
-                feedback.textContent = "Passwords don't match.";
-                feedback.className = "message error";
+                feedback.textContent = "❌ Passwords don't match.";
+                feedback.className = "text-red-500 text-sm text-center";
             } else {
                 feedback.textContent = "✅ Passwords match!";
-                feedback.className = "message success";
+                feedback.className = "text-green-500 text-sm text-center";
             }
         });
     </script>
 </body>
-=======
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Create Account</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .error { color: red; }
-        .success { color: green; }
-        .message { margin-top: 10px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Create Account</h2>
-        <form method="POST" id="registerForm">
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" id="password" placeholder="Password" required>
-            <input type="password" name="confirm_password" id="confirm_password" placeholder="Confirm Password" required>
-            <button type="submit">Create Account</button>
-        </form>
-        <p class="message" id="feedback"></p>
-    </div>
-
-    <script>
-        const form = document.getElementById("registerForm");
-        const password = document.getElementById("password");
-        const confirmPassword = document.getElementById("confirm_password");
-        const feedback = document.getElementById("feedback");
-
-        form.addEventListener("submit", function (e) {
-            if (password.value !== confirmPassword.value) {
-                e.preventDefault();
-                feedback.textContent = "Passwords don't match.";
-                feedback.className = "message error";
-            } else {
-                feedback.textContent = "✅ Passwords match!";
-                feedback.className = "message success";
-            }
-        });
-    </script>
-</body>
->>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
 </html>

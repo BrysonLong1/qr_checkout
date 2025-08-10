@@ -1,29 +1,29 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
-from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 import stripe, qrcode, io, base64, os
 from datetime import datetime
-from forms import LoginForm, RegisterForm
-from models import db, User
+from pytz import timezone
 
-<<<<<<< HEAD
-# Load environment variables from .env file
-=======
->>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
+from forms import LoginForm, RegisterForm, TicketForm
+from models import db, User, Ticket
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import generate_csrf
+
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-app.config.from_pyfile('config.py')
+app.config.from_pyfile('config.py')  # must include SECRET_KEY
 
-<<<<<<< HEAD
-# Initialize extensions
-=======
-# Init plugins
->>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
+# Init extensions (AFTER app is created)
 db.init_app(app)
 bcrypt = Bcrypt(app)
+csrf = CSRFProtect(app)
+app.jinja_env.globals['csrf_token'] = generate_csrf
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -32,6 +32,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# ---------------------------
+# Auth
+# ---------------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()
@@ -40,11 +43,6 @@ def register():
         if existing_user:
             flash('Email already registered')
             return redirect(url_for('register'))
-<<<<<<< HEAD
-
-=======
-        
->>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
         hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         new_user = User(email=form.email.data, password=hashed_pw)
         db.session.add(new_user)
@@ -65,84 +63,143 @@ def login():
             flash('Invalid email or password.')
     return render_template('login.html', form=form)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
+# ---------------------------
+# Ticket Dashboard (creator adds up to 5 tickets)
+# ---------------------------
+@app.route('/dashboard', methods=['GET', 'POST'])
+@login_required
+def dashboard():
+    form = TicketForm()
+    tickets = Ticket.query.filter_by(user_id=current_user.id).all()
+
+    if form.validate_on_submit():
+        if len(tickets) >= 5:
+            flash("You can only add up to 5 tickets.")
+        else:
+            t = Ticket(name=form.name.data, price=form.price.data, user_id=current_user.id)
+            db.session.add(t)
+            db.session.commit()
+            flash("Ticket added.")
+        return redirect(url_for('dashboard'))
+
+    return render_template('dashboard.html', form=form, tickets=tickets)
+
+# ---------------------------
+# Generate QR for selected ticket (dropdown shows ticket names only)
+# ---------------------------
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
-    DRINKS = {
-        "Tequila": 8.00,
-        "Shirley Temple": 3.50,
-        "Can beer/seltzers": 5.00,
-        "Heineken": 5.95,
-        "Liqueurs/Other": 8.00,
-        "White Claw": 7.75,
-        "Michelob ultra": 5.00,
-        "Red Bull": 6.00,
-        "Ray’s Rum Punch": 13.00,
-        "Strawberry Vodka Lemonade": 8.00,
-        "Deer Park Bottled Water": 2.00,
-        "Corona Extra": 5.00,
-        "Bud Light": 5.00,
-        "Rum": 7.00,
-        "Jamaican Mule": 13.00,
-        "Housemade Juices and Lemonades": 5.00
-    }
+    tickets = Ticket.query.filter_by(user_id=current_user.id).all()
+    has_tickets = len(tickets) > 0
 
-    SERVICE_FEE = 3.20
+    if request.method == 'POST' and 'ticket_id' in request.form:
+        try:
+            ticket_id = int(request.form.get('ticket_id'))
+        except (TypeError, ValueError):
+            flash("Please select a valid ticket.")
+            return redirect(url_for('index'))
 
-    if request.method == 'POST':
-        drink = request.form['drink']
-        tip = float(request.form.get('tip', 0))
-        base_price = DRINKS.get(drink, 0)
-        total_price = round(base_price + SERVICE_FEE + tip, 2)
+        sel = Ticket.query.get_or_404(ticket_id)
+        if sel.user_id != current_user.id:
+            flash("Not your ticket.")
+            return redirect(url_for('index'))
 
+        SERVICE_FEE = 4.50  # flat platform fee
+        total_price = round(float(sel.price) + SERVICE_FEE, 2)
+
+        # Build success URL (encode ticket name)
+        success_url = (
+            "https://teameventlock.com/success"
+            f"?ticket={quote_plus(sel.name)}"
+            f"&price={total_price}"
+        )
+
+        # Create Stripe Checkout Session
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
                     'currency': 'usd',
-                    'product_data': {'name': drink},
+                    'product_data': {'name': sel.name},
                     'unit_amount': int(total_price * 100),
                 },
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=request.host_url + 'success?drink=' + drink + '&price=' + str(total_price),
+            success_url=success_url,
             cancel_url=request.host_url,
         )
 
+        # Generate QR for the session URL and show inline
         qr = qrcode.make(session.url)
         buffered = io.BytesIO()
         qr.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        return render_template('qrcode.html', img_data=img_str)
+        return render_template(
+            'qrcode.html',
+            img_data=img_str,
+            ticket_name=sel.name,
+            total_price=total_price
+        )
 
-    return render_template('index.html', drinks=DRINKS, service_fee=SERVICE_FEE)
+    # GET: render dropdown (blank/disabled if no tickets exist)
+    return render_template(
+        "index.html",
+        tickets=tickets,
+        has_tickets=has_tickets,
+        service_fee=4.5
 
-<<<<<<< HEAD
+    )
+
+# ---------------------------
+# Optional scan landing (kept individual; no reuse tracking)
+# ---------------------------
+@app.route('/ticket/<int:ticket_id>')
+def ticket_scan(ticket_id):
+    t = Ticket.query.get_or_404(ticket_id)
+    return f"Scanned ticket: {t.name} - ${t.price}"
+
+# ---------------------------
+# Success + Debug
+# ---------------------------
 @app.route('/success')
-@login_required
 def success():
-    drink = request.args.get('drink')
-    price = request.args.get('price')
-    return render_template('success.html', drink=drink, price=price)
+    eastern = timezone('US/Eastern')
+    ticket = request.args.get('ticket', default='Unknown Ticket')
+    price = request.args.get('price', default='0.00')
+    timestamp = datetime.now(eastern).strftime('%B %d, %Y at %I:%M %p')
 
-# Start the Flask app
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-=======
+    print("SUCCESS ROUTE HIT")
+    print("Ticket:", ticket)
+    print("Price:", price)
+
+    return render_template('success.html', ticket=ticket, price=price, timestamp=timestamp)
 
 @app.route('/_debug')
 def debug_check():
-    return "✔ Running correct app.py from VS Code"
->>>>>>> 2ce1298 (Initial commit with full app and gunicorn_test)
+    return "✔ App is running"
+
+@app.route('/ticket/<int:ticket_id>/delete', methods=['POST'])
+@login_required
+def delete_ticket(ticket_id):
+    t = Ticket.query.get_or_404(ticket_id)
+    if t.user_id != current_user.id:
+        abort(403)
+    db.session.delete(t)
+    db.session.commit()
+    flash('Ticket deleted.')
+    return redirect(url_for('dashboard'))
+
+# ---------------------------
+# Local dev
+# ---------------------------
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
