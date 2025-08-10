@@ -12,7 +12,10 @@
     {% if tickets %}
       <label for="preview" class="block mt-4">Select Ticket</label>
       <select id="preview" class="w-full px-4 py-2 rounded-md bg-white text-black">
-        {% for t in tickets %}<option>{{ t.name }} - ${{ '%.2f'|format(t.price) }}</option>{% endfor %}
+        {% for t in tickets %}
+          <option>{{ t.name }} - ${{ '%.2f' % (t.price|float) }}</option>
+          {# if price is cents: use  (t.price|int) / 100.0  instead #}
+        {% endfor %}
       </select>
       <p class="text-sm text-gray-300">Add Tickets</p>
     {% else %}
@@ -20,7 +23,7 @@
     {% endif %}
 
     <div id="ticket-form" style="display:none;" class="mt-4 text-left">
-      <form method="POST">
+      <form method="POST" action="{{ url_for('dashboard') }}">
         {{ form.hidden_tag() }}
         <label class="block mb-2">{{ form.name.label }}</label>
         {{ form.name(class_="w-full px-3 py-2 rounded-md text-black") }}
