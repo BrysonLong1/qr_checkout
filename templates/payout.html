@@ -1,0 +1,8 @@
+<button onclick="startConnect()">Set up payouts</button>
+<script>
+async function startConnect() {
+  const r = await fetch('/api/connect/create-account', {method:'POST'});
+  const { url } = await r.json();
+  window.location = url; // go to Stripe onboarding
+}
+</script>

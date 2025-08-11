@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, render_template_string
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
 from dotenv import load_dotenv
@@ -8,7 +8,7 @@ from datetime import datetime
 from pytz import timezone
 
 from forms import LoginForm, RegisterForm, TicketForm
-from models import db, User, Ticket
+from models import db, User, Ticket   # NOTE: add Venue to models.py (shown below)
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import generate_csrf
 
@@ -27,6 +27,16 @@ app.jinja_env.globals['csrf_token'] = generate_csrf
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+# ----- Stripe Connect blueprint -----
+from connect_routes import connect_bp
+app.register_blueprint(connect_bp)
+
+
+# ----- Stripe Connect blueprint -----
+# (create connect_routes.py from my previous message)
+from connect_routes import bp as connect_bp
+app.register_blueprint(connect_bp, url_prefix="")  # exposes /api/connect/*
+csrf.exempt(connect_bp)  # allow JS POSTs to /api/connect/* without CSRF token
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -91,7 +101,7 @@ def dashboard():
     return render_template('dashboard.html', form=form, tickets=tickets)
 
 # ---------------------------
-# Generate QR for selected ticket (dropdown shows ticket names only)
+# Generate QR for selected ticket
 # ---------------------------
 @app.route('/', methods=['GET', 'POST'])
 @login_required
@@ -114,14 +124,11 @@ def index():
         SERVICE_FEE = 4.50  # flat platform fee
         total_price = round(float(sel.price) + SERVICE_FEE, 2)
 
-        # Build success URL (encode ticket name)
         success_url = (
             "https://teameventlock.com/success"
-            f"?ticket={quote_plus(sel.name)}"
-            f"&price={total_price}"
+            f"?ticket={quote_plus(sel.name)}&price={total_price}"
         )
 
-        # Create Stripe Checkout Session
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -137,50 +144,51 @@ def index():
             cancel_url=request.host_url,
         )
 
-        # Generate QR for the session URL and show inline
         qr = qrcode.make(session.url)
         buffered = io.BytesIO()
         qr.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        return render_template(
-            'qrcode.html',
-            img_data=img_str,
-            ticket_name=sel.name,
-            total_price=total_price
-        )
+        return render_template('qrcode.html', img_data=img_str, ticket_name=sel.name, total_price=total_price)
 
-    # GET: render dropdown (blank/disabled if no tickets exist)
-    return render_template(
-        "index.html",
-        tickets=tickets,
-        has_tickets=has_tickets,
-        service_fee=4.5
-
-    )
+    return render_template("index.html", tickets=tickets, has_tickets=has_tickets, service_fee=4.5)
 
 # ---------------------------
-# Optional scan landing (kept individual; no reuse tracking)
+# Optional: simple payouts page with button (calls /api/connect/*)
+# ---------------------------
+@app.route('/payouts')
+@login_required
+def payouts():
+    return render_template_string("""
+      <h2>Connect to Stripe for payouts</h2>
+      <button onclick="startConnect({{ current_user.id }})">Set up payouts</button>
+      <script>
+      async function startConnect(venueId){
+        const r = await fetch('/api/connect/create-account', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ venue_id: venueId })
+        });
+        const { account_id } = await r.json();
+        window.location = `/api/connect/onboard?account_id=${account_id}`;
+      }
+      </script>
+    """)
+
+# ---------------------------
+# Misc
 # ---------------------------
 @app.route('/ticket/<int:ticket_id>')
 def ticket_scan(ticket_id):
     t = Ticket.query.get_or_404(ticket_id)
     return f"Scanned ticket: {t.name} - ${t.price}"
 
-# ---------------------------
-# Success + Debug
-# ---------------------------
 @app.route('/success')
 def success():
     eastern = timezone('US/Eastern')
     ticket = request.args.get('ticket', default='Unknown Ticket')
     price = request.args.get('price', default='0.00')
     timestamp = datetime.now(eastern).strftime('%B %d, %Y at %I:%M %p')
-
-    print("SUCCESS ROUTE HIT")
-    print("Ticket:", ticket)
-    print("Price:", price)
-
+    print("SUCCESS ROUTE HIT", ticket, price)
     return render_template('success.html', ticket=ticket, price=price, timestamp=timestamp)
 
 @app.route('/_debug')
@@ -202,4 +210,6 @@ def delete_ticket(ticket_id):
 # Local dev
 # ---------------------------
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # make sure new tables (Venue) get created
     app.run(host='0.0.0.0', port=5000, debug=True)

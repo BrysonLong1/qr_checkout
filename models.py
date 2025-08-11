@@ -9,6 +9,11 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
 
+    # --- Stripe Connect fields ---
+    stripe_account_id = db.Column(db.String(64), index=True)          # e.g. "acct_1ABCDEF..."
+    charges_enabled   = db.Column(db.Boolean, default=False)          # optional: payouts readiness
+    details_submitted = db.Column(db.Boolean, default=False)          # optional: onboarding done
+
     def __repr__(self):
         return f"<User {self.email}>"
 
