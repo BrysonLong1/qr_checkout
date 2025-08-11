@@ -3,12 +3,12 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_bcrypt import Bcrypt
 from dotenv import load_dotenv
 from urllib.parse import quote_plus
-import stripe, qrcode, io, base64, os
+import stripe, qrcode, io, base64, os   # <-- fixed import stripe
 from datetime import datetime
 from pytz import timezone
 
 from forms import LoginForm, RegisterForm, TicketForm
-from models import db, User, Ticket   # NOTE: add Venue to models.py (shown below)
+from models import db, User, Ticket
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import generate_csrf
 
@@ -26,17 +26,13 @@ app.jinja_env.globals['csrf_token'] = generate_csrf
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-# ----- Stripe Connect blueprint -----
+
+# ----- Stripe Connect blueprint (single source of truth) -----
 from connect_routes import connect_bp
 app.register_blueprint(connect_bp)
-
-
-# ----- Stripe Connect blueprint -----
-# (create connect_routes.py from my previous message)
-from connect_routes import bp as connect_bp
-app.register_blueprint(connect_bp, url_prefix="")  # exposes /api/connect/*
-csrf.exempt(connect_bp)  # allow JS POSTs to /api/connect/* without CSRF token
+csrf.exempt(connect_bp)  # allow JS POSTs to /api/connect/*
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -154,23 +150,21 @@ def index():
     return render_template("index.html", tickets=tickets, has_tickets=has_tickets, service_fee=4.5)
 
 # ---------------------------
-# Optional: simple payouts page with button (calls /api/connect/*)
+# Payouts page (single definition)
 # ---------------------------
 @app.route('/payouts')
 @login_required
 def payouts():
     return render_template_string("""
       <h2>Connect to Stripe for payouts</h2>
-      <button onclick="startConnect({{ current_user.id }})">Set up payouts</button>
+      <button id="connectBtn">Set up payouts</button>
       <script>
-      async function startConnect(venueId){
-        const r = await fetch('/api/connect/create-account', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ venue_id: venueId })
-        });
-        const { account_id } = await r.json();
-        window.location = `/api/connect/onboard?account_id=${account_id}`;
-      }
+      document.getElementById('connectBtn').onclick = async () => {
+        const r = await fetch('/api/connect/create-account', { method:'POST' });
+        if (!r.ok) { alert('Failed to start onboarding'); return; }
+        const j = await r.json();
+        window.location = j.url; // go to Stripe onboarding
+      };
       </script>
     """)
 
@@ -211,5 +205,5 @@ def delete_ticket(ticket_id):
 # ---------------------------
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # make sure new tables (Venue) get created
+        db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)
