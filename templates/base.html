@@ -1,21 +1,20 @@
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- Open Graph / Facebook -->
+  <!-- Open Graph / Facebook -->
   <meta property="og:title" content="Teameventlock" />
   <meta property="og:description" content="Secure your tickets and manage payouts with ease." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://teameventlock.com/" />
   <meta property="og:image" content="https://teameventlock.com/static/share.png" />
 
-<!-- Twitter -->
+  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Teameventlock" />
   <meta name="twitter:description" content="Secure your tickets and manage payouts with ease." />
   <meta name="twitter:image" content="https://teameventlock.com/static/share.png" />
 
-
-	
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Teameventlock{% endblock %}</title>
@@ -27,10 +26,15 @@
     *{box-sizing:border-box}
     html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
       font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
-      padding:10px 14px;background:#0a0a0a;border-bottom:1px solid #1e1e1e}
+
+    /* Sticky topbar above everything */
+    .topbar{
+      position:sticky; top:0; z-index:9999;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 14px; background:#0a0a0a; border-bottom:1px solid #1e1e1e
+    }
     .brand{display:flex;gap:10px;align-items:center}
-    .brand img{height:28px}
+    .brand img{height:28px; width:auto; max-width:160px; object-fit:contain}
     .brand span{font-weight:700;letter-spacing:.3px}
     .right{display:flex;gap:10px;align-items:center}
     .chip{font-size:12px;color:var(--muted)}
@@ -39,6 +43,10 @@
     .btn-primary{background:linear-gradient(90deg, orange, var(--accent))}
     .btn-primary:hover{filter:brightness(1.05)}
     .wrap{padding:16px}
+
+    /* Mobile dropdown directly under header */
+    #mobileMenu{ z-index:9998; position:relative; }
+    main.wrap{ position:relative; z-index:1; }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -92,19 +100,21 @@
     </div>
   </div>
 
-  <!-- Content wrapper: fluid with safe max width + overflow guards -->
+  <!-- Content wrapper -->
   <main class="wrap mx-auto w-full max-w-6xl px-4 sm:px-6">
     <div class="rounded-2xl border border-[#1e1e1e] bg-[var(--card)] p-4 sm:p-6">
-      <div class="min-w-0 overflow-x-auto"> <!-- prevents horizontal overflow on mobile -->
+      <div class="min-w-0 overflow-x-auto">
         {% block content %}{% endblock %}
       </div>
     </div>
   </main>
 
   <script>
-    const btn = document.getElementById('menuBtn');
-    const menu = document.getElementById('mobileMenu');
-    if (btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+    try {
+      const btn = document.getElementById('menuBtn');
+      const menu = document.getElementById('mobileMenu');
+      if (btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+    } catch (e) { console.error('Navbar init error', e); }
   </script>
 
   {% block scripts %}{% endblock %}

@@ -1,127 +1,200 @@
-# connect_routes.py
 import os
 from urllib.parse import urlencode
+from dotenv import load_dotenv
 
 import stripe
 from flask import Blueprint, jsonify, request, redirect
 from flask_login import login_required, current_user
+from models import db
 
-from models import db  # import once at top
+# Load .env for local/dev; in production you also set envs via systemd
+load_dotenv()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-BASE_URL = os.getenv("PLATFORM_BASE_URL", "http://localhost:5000")
+BASE_URL = os.getenv("PLATFORM_BASE_URL", "https://teameventlock.com")
 
-# export this name (app.py imports connect_bp)
 connect_bp = Blueprint("connect_bp", __name__)
 
-
-# Helper: ensure current_user has a connected account; create if missing
 def _ensure_account_id_for(user):
+    """
+    Ensure the user has a Stripe Express account and that both capabilities are requested.
+    """
     acct_id = getattr(user, "stripe_account_id", None)
+
     if not acct_id:
+        # New account: request BOTH capabilities up-front (normal marketplace flow)
         acct = stripe.Account.create(
             type="express",
+            country="US",
             email=user.email,
-            capabilities={"transfers": {"requested": True}},
+            capabilities={
+                "card_payments": {"requested": True},
+                "transfers": {"requested": True},
+            },
             metadata={"user_id": str(user.id)},
         )
         user.stripe_account_id = acct.id
         db.session.commit()
-        acct_id = acct.id
+        return acct.id
+
+    # Existing account: re-request capabilities if not active or pending
+    acct = stripe.Account.retrieve(acct_id)
+    caps = getattr(acct, "capabilities", {}) or {}
+    needs_card = caps.get("card_payments") not in ("active", "pending")
+    needs_transfers = caps.get("transfers") not in ("active", "pending")
+    if needs_card or needs_transfers:
+        stripe.Account.modify(
+            acct_id,
+            capabilities={
+                "card_payments": {"requested": True},
+                "transfers": {"requested": True},
+            },
+        )
     return acct_id
 
 
-# 1) Create/ensure account, then generate onboarding link
-#    POST /api/connect/create-account
+@connect_bp.get("/api/connect/health")
+def connect_health():
+    """Ping Stripe for a specific connected account and report readiness."""
+    import stripe, os
+    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")  # platform key
+
+    acct_id = request.args.get("acct")
+    if not acct_id:
+        return jsonify({"ok": False, "error": "Missing ?acct=acct_..." }), 400
+
+    try:
+        acct = stripe.Account.retrieve(acct_id)
+        caps = getattr(acct, "capabilities", {}) or {}
+
+        result = {
+            "ok": bool(acct.charges_enabled and acct.payouts_enabled),
+            "id": acct.id,
+            "charges_enabled": bool(acct.charges_enabled),
+            "payouts_enabled": bool(acct.payouts_enabled),
+            "details_submitted": bool(getattr(acct, "details_submitted", False)),
+            "capabilities": {
+                "card_payments": caps.get("card_payments"),
+                "transfers": caps.get("transfers"),
+            },
+            "currently_due": (getattr(getattr(acct, "requirements", None), "currently_due", None) or []),
+        }
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+# Start onboarding (creates/ensures account, returns onboarding link)
 @connect_bp.post("/api/connect/create-account")
 @login_required
 def create_account():
-    account_id = _ensure_account_id_for(current_user)
+    try:
+        account_id = _ensure_account_id_for(current_user)
+        link = stripe.AccountLink.create(
+            account=account_id,
+            refresh_url=f"{BASE_URL}/connect/reauth?{urlencode({'account_id': account_id})}",
+            return_url=f"{BASE_URL}/connect/return?{urlencode({'account_id': account_id})}",
+            type="account_onboarding",
+        )
+        return jsonify({"account_id": account_id, "url": link.url}), 200
+    except stripe.error.StripeError as e:
+        msg = getattr(e, "user_message", None) or str(e)
+        print(f"[StripeError] {e}")
+        return jsonify({"error": msg}), 400
+    except Exception as e:
+        print(f"[ConnectError] {e}")
+        return jsonify({"error": str(e)}), 500
 
-    link = stripe.AccountLink.create(
-        account=account_id,
-        refresh_url=f"{BASE_URL}/connect/reauth?{urlencode({'account_id': account_id})}",
-        return_url=f"{BASE_URL}/connect/return?{urlencode({'account_id': account_id})}",
-        type="account_onboarding",
-    )
-    return jsonify({"account_id": account_id, "url": link.url})
 
-
-# 2) Refresh link Stripe can send the user to if the flow expires
-#    GET /connect/reauth?account_id=acct_xxx
+# If their link expired, generate a fresh one
 @connect_bp.get("/connect/reauth")
 @login_required
 def reauth():
-    account_id = request.args.get("account_id") or _ensure_account_id_for(current_user)
-    link = stripe.AccountLink.create(
-        account=account_id,
-        refresh_url=f"{BASE_URL}/connect/reauth?{urlencode({'account_id': account_id})}",
-        return_url=f"{BASE_URL}/connect/return?{urlencode({'account_id': account_id})}",
-        type="account_onboarding",
-    )
-    return redirect(link.url)
+    try:
+        account_id = request.args.get("account_id") or _ensure_account_id_for(current_user)
+        link = stripe.AccountLink.create(
+            account=account_id,
+            refresh_url=f"{BASE_URL}/connect/reauth?{urlencode({'account_id': account_id})}",
+            return_url=f"{BASE_URL}/connect/return?{urlencode({'account_id': account_id})}",
+            type="account_onboarding",
+        )
+        return redirect(link.url)
+    except Exception as e:
+        print(f"[ConnectReauthError] {e}")
+        return redirect("/payouts")
 
 
-# 3) Return target after onboarding completes
-#    GET /connect/return?account_id=acct_xxx
+# Land here after onboarding
 @connect_bp.get("/connect/return")
 @login_required
 def connect_return():
     account_id = request.args.get("account_id") or getattr(current_user, "stripe_account_id", None)
     if not account_id:
         return redirect("/payouts")
-
-    acct = stripe.Account.retrieve(account_id)
-
-    # Optional: persist useful flags on your user record
-    # Add these columns to your User model if you want to store:
-    #   charges_enabled = db.Column(db.Boolean, default=False)
-    #   details_submitted = db.Column(db.Boolean, default=False)
     try:
+        acct = stripe.Account.retrieve(account_id)
+        # Persist helpful flags on the user record
+        if hasattr(current_user, "stripe_account_id") and not current_user.stripe_account_id:
+            current_user.stripe_account_id = acct.id
         if hasattr(current_user, "charges_enabled"):
-            current_user.charges_enabled = bool(acct.charges_enabled)
+            current_user.charges_enabled = bool(acct.get("charges_enabled"))
         if hasattr(current_user, "details_submitted"):
-            current_user.details_submitted = bool(acct.details_submitted)
+            current_user.details_submitted = bool(acct.get("details_submitted"))
         db.session.commit()
     except Exception:
         db.session.rollback()
+    return redirect("/payouts?onboard=done")
 
-    # back to your payouts page (or wherever)
-    return redirect("/payouts")
-
-
-# 4) Express Dashboard quick link for the connected account
-#    POST /api/connect/dashboard
+# Express Dashboard button (nice-to-have)
 @connect_bp.post("/api/connect/dashboard")
 @login_required
 def express_dashboard():
-    account_id = _ensure_account_id_for(current_user)
-    login_link = stripe.Account.create_login_link(account_id)
-    return jsonify({"url": login_link.url})
+    try:
+        account_id = _ensure_account_id_for(current_user)
+        login_link = stripe.Account.create_login_link(account_id)
+        return jsonify({"url": login_link.url}), 200
+    except Exception as e:
+        print(f"[DashboardLinkError] {e}")
+        return jsonify({"error": str(e)}), 400
 
+@connect_bp.get("/api/connect/status")
+@login_required
+def connect_status():
+    try:
+        acct_id = getattr(current_user, "stripe_account_id", None)
+        if not acct_id:
+            return jsonify({"ready": False, "reason": "no_account"}), 200
 
-# 5) (Optional) Webhook to track account state changes
-#    POST /stripe/webhook
+        # If you persist flags on the user, trust them first:
+        charges_ok = bool(getattr(current_user, "charges_enabled", False))
+        details_ok = bool(getattr(current_user, "details_submitted", False))
+        # Optionally double-check with Stripe to be extra sure:
+        if not (charges_ok and details_ok):
+            acct = stripe.Account.retrieve(acct_id)
+            charges_ok = bool(acct.get("charges_enabled"))
+            details_ok = bool(acct.get("details_submitted"))
+
+        return jsonify({
+            "ready": charges_ok and details_ok,
+            "charges_enabled": charges_ok,
+            "details_submitted": details_ok
+        }), 200
+    except Exception as e:
+        print(f"[ConnectStatusError] {e}")
+        return jsonify({"ready": False, "error": "status_check_failed"}), 200
+
+# Webhook (optional) to monitor account updates
 @connect_bp.post("/stripe/webhook")
 def stripe_webhook():
     payload = request.data
     sig_header = request.headers.get("Stripe-Signature")
-    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")  # set in Dashboard
-
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except ValueError:
-        return "Invalid payload", 400
-    except stripe.error.SignatureVerificationError:
-        return "Invalid signature", 400
+    except Exception:
+        return "Invalid", 400
 
-    if event["type"] == "account.updated":
+    if event.get("type") == "account.updated":
         acct = event["data"]["object"]
-        # Example: update the user if you store the acct->user relationship
-        # user = User.query.filter_by(stripe_account_id=acct["id"]).first()
-        # if user and hasattr(user, "charges_enabled"):
-        #     user.charges_enabled = bool(acct.get("charges_enabled"))
-        #     db.session.commit()
-        print("Account updated:", acct["id"])
+        print(f"[Webhook] account.updated {acct.get('id')} charges_enabled={acct.get('charges_enabled')}")
 
     return "", 200

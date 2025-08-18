@@ -1,5 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+app.py
+from flask import (
+    Flask, render_template, request, redirect, url_for, flash, abort
+)
+from flask_login import (
+    LoginManager, login_user, logout_user, login_required, current_user
+)
 from flask_bcrypt import Bcrypt
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import generate_csrf
@@ -10,46 +15,17 @@ from urllib.parse import urlparse, urljoin, quote_plus
 from flask_migrate import Migrate
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from sqlalchemy import func
 import stripe, qrcode, io, base64, os
 
 from forms import LoginForm, RegisterForm, TicketForm
 from models import db, User, Ticket
-
+from sqlalchemy import func
 # ------------------ Setup ------------------
 load_dotenv()
 
-# ===== TONIGHT MODE SWITCH =====
-# Set to True to disable email confirmation + allow QR flow without Stripe Connect.
-# Later, set to False to restore normal behavior.
-TONIGHT_MODE = True
-
 app = Flask(__name__)
-app.config.from_pyfile('config.py')  # expects SECRET_KEY, SQLALCHEMY_DATABASE_URI, mail settings, etc.
-
-# --- Mail + security fallbacks from ENV (safe defaults) ---
-def _env_bool(name, default):
-    val = os.getenv(name)
-    if val is None:
-        return default
-    return str(val).strip() in ("1", "true", "True", "yes", "on")
-
-app.config.setdefault("MAIL_SERVER", os.getenv("MAIL_SERVER", "smtp.gmail.com"))
-app.config.setdefault("MAIL_PORT", int(os.getenv("MAIL_PORT", 587)))
-app.config.setdefault("MAIL_USE_TLS", _env_bool("MAIL_USE_TLS", True))
-app.config.setdefault("MAIL_USE_SSL", _env_bool("MAIL_USE_SSL", False))
-app.config.setdefault("MAIL_USERNAME", os.getenv("MAIL_USERNAME"))
-app.config.setdefault("MAIL_PASSWORD", os.getenv("MAIL_PASSWORD"))
-app.config.setdefault("MAIL_DEFAULT_SENDER", os.getenv("MAIL_DEFAULT_SENDER", "Team Event Lock <noreply@teameventlock.com>"))
-# Suppress sending entirely tonight so SMTP is never hit
-app.config["MAIL_SUPPRESS_SEND"] = True if TONIGHT_MODE else _env_bool("MAIL_SUPPRESS_SEND", False)
-
-# SECRET_KEY fallback
-app.config.setdefault("SECRET_KEY", os.getenv("SECRET_KEY", "change-me"))
-
-# salt + expiration for confirm tokens (kept for later)
-app.config.setdefault("SECURITY_CONFIRM_SALT", os.getenv("SECURITY_CONFIRM_SALT", "change-me-too"))
-app.config.setdefault("CONFIRM_TOKEN_EXPIRATION", int(os.getenv("CONFIRM_TOKEN_EXPIRATION", 60 * 60 * 24)))  # 24h
+# config.py should define: SECRET_KEY, SQLALCHEMY_DATABASE_URI, STRIPE_SECRET_KEY, etc.
+app.config.from_pyfile('config.py')
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -67,13 +43,10 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 # Mail
 mail = Mail(app)
 
-# (Optional) Stripe Connect blueprint
-try:
-    from connect_routes import connect_bp
-    app.register_blueprint(connect_bp)
-    csrf.exempt(connect_bp)
-except Exception:
-    pass
+# Stripe Connect blueprint (if you have connect_routes.py)
+from connect_routes import connect_bp
+app.register_blueprint(connect_bp)
+csrf.exempt(connect_bp)  # allow JS POSTs to /api/connect/*
 
 # ------------------ Helpers ------------------
 @login_manager.user_loader
@@ -85,95 +58,60 @@ def is_safe_url(target: str) -> bool:
     test_url = urlparse(urljoin(request.host_url, target))
     return (test_url.scheme in ("http", "https")) and (host_url.netloc == test_url.netloc)
 
-# ----- Email Confirmation helpers (kept for later) -----
+# ----- Email Confirmation helpers -----
 def _ts() -> URLSafeTimedSerializer:
-    secret = app.config.get("SECRET_KEY") or "change-me"
-    salt = app.config.get("SECURITY_CONFIRM_SALT") or "change-me-too"
-    return URLSafeTimedSerializer(secret, salt=salt)
+    return URLSafeTimedSerializer(
+        app.config["SECRET_KEY"],
+        salt=app.config["SECURITY_CONFIRM_SALT"]
+    )
 
 def generate_confirm_token(user_id: int) -> str:
     return _ts().dumps({"uid": user_id})
 
 def verify_confirm_token(token: str, max_age: int | None = None):
     if max_age is None:
-        max_age = int(app.config.get("CONFIRM_TOKEN_EXPIRATION", 3600))
+        max_age = app.config.get("CONFIRM_TOKEN_EXPIRATION", 3600)  # seconds
     try:
         data = _ts().loads(token, max_age=max_age)
         return data.get("uid")
-    except SignatureExpired:
-        app.logger.warning("Email confirmation token expired")
-        return None
-    except BadSignature:
-        app.logger.warning("Invalid email confirmation token")
+    except (SignatureExpired, BadSignature):
         return None
 
 def send_confirmation_email(user: User):
-    """Tonight: do nothing (no SMTP) so routes never hang or 500."""
-    if TONIGHT_MODE or app.config.get("MAIL_SUPPRESS_SEND"):
-        app.logger.info("Email sending disabled (TONIGHT_MODE) for %s", user.email)
-        return
-    # (Normal mode implementation kept for later)
     token = generate_confirm_token(user.id)
     confirm_url = url_for("confirm_email", token=token, _external=True)
-    subject = "Confirm your Team Event Lock email"
-    try:
-        text_body = render_template("emails/confirm.txt", user=user, confirm_url=confirm_url)
-        html_body = render_template("emails/confirm.html", user=user, confirm_url=confirm_url)
-    except Exception as e:
-        app.logger.exception("Email template render failed: %s", e)
-        text_body = f"Confirm your account: {confirm_url}"
-        html_body = None
-    try:
-        msg = Message(subject=subject, recipients=[user.email], body=text_body)
-        if html_body:
-            msg.html = html_body
-        if not getattr(msg, "sender", None):
-            msg.sender = app.config.get("MAIL_DEFAULT_SENDER")
-        mail.send(msg)
-    except Exception as e:
-        app.logger.exception("SMTP send failed: %s", e)
-        return
+    subject = "Confirm your email"
 
-# ------------------ TONIGHT: disable email-confirmation gate ------------------
-@app.before_request
-def _gate_unconfirmed():
-    # Do nothing so users can use the app without confirming email.
-    return
+    # plain text + HTML bodies (ensure these templates exist)
+    text_body = render_template("emails/confirm.txt", user=user, confirm_url=confirm_url)
+    html_body = render_template("emails/confirm.html", user=user, confirm_url=confirm_url)
+
+    msg = Message(subject=subject, recipients=[user.email], body=text_body, html=html_body)
+    mail.send(msg)
 
 # ------------------ Auth ------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-        email = (form.email.data or "").strip().lower()
-        existing_user = User.query.filter(func.lower(User.email) == email).first()
+        existing_user = User.query.filter_by(email=form.email.data).first()
         if existing_user:
-            flash('Email already registered.', 'error')
+            flash('Email already registered.')
             return redirect(url_for('register'))
 
         hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        new_user = User(email=email, password=hashed_pw)
-
-        # In tonight mode, auto-confirm so login/UI never blocks
-        if TONIGHT_MODE:
-            try:
-                new_user.email_confirmed_at = datetime.now(dt_timezone.utc)
-            except Exception:
-                pass
+        new_user = User(email=form.email.data, password=hashed_pw)
 
         db.session.add(new_user)
         db.session.commit()
 
-        # Try to send (no-op tonight)
+        # Send confirmation email
         try:
             send_confirmation_email(new_user)
-            if not TONIGHT_MODE:
-                flash('Registration successful! Please check your email to confirm before logging in.', 'success')
-            else:
-                flash('Registration successful!', 'success')
+            flash('Registration successful! Please check your email to confirm before logging in.')
         except Exception:
             app.logger.exception("Signup confirmation email failed")
-            flash('Registration succeeded.', 'success')
+            flash('Registration succeeded, but we could not send the confirmation email. After logging in you can use “Resend confirmation”.')
 
         return redirect(url_for('login'))
     return render_template('register.html', form=form)
@@ -182,30 +120,65 @@ def register():
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        email = (form.email.data or "").strip().lower()
-        user = User.query.filter(func.lower(User.email) == email).first()
+        user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
-            login_user(user)
+            login_user(user@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegisterForm()
+    if form.validate_on_submit():
+        # normalize email (trim + lowercase)
+        email = (form.email.data or "").strip().lower()
 
-            # ---- optional payouts gate (bypassed in tonight mode) ----
+        # case-insensitive uniqueness check
+        existing_user = User.query.filter(func.lower(User.email) == email).first()
+        if existing_user:
+            flash('Email already registered.', 'error')
+            return redirect(url_for('register'))
+
+        # create user
+        hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        new_user = User(email=email, password=hashed_pw)
+        db.session.add(new_user)
+        db.session.commit()
+
+        # send confirmation email
+        try:
+            send_confirmation_email(new_user)
+            flash('Registration successful! Please check your email to confirm before logging in.', 'success')
+        except Exception:
+            app.logger.exception("Signup confirmation email failed")
+            flash(
+                'Registration succeeded, but we could not send the confirmation email. '
+                'Please log in and use “Send confirmation email” from your dashboard.',
+                'warning'
+            )
+
+        return redirect(url_for('login'))
+
+    return render_template('register.html', form=form))
+
+            # ---- Optional gate: force payouts onboarding after login ----
             needs_payouts = False
-            if not TONIGHT_MODE:
-                acct_id = getattr(user, "stripe_account_id", None)
-                if not acct_id or not getattr(user, "charges_enabled", False):
+            acct_id = getattr(user, "stripe_account_id", None)
+
+            if not acct_id or not getattr(user, "charges_enabled", False):
+                needs_payouts = True
+            else:
+                # Optional live verification
+                try:
+                    acct = stripe.Account.retrieve(acct_id)
+                    needs_payouts = not (acct.charges_enabled and acct.payouts_enabled)
+                except Exception:
                     needs_payouts = True
-                else:
-                    try:
-                        acct = stripe.Account.retrieve(acct_id)
-                        needs_payouts = not (acct.charges_enabled and acct.payouts_enabled)
-                    except Exception:
-                        needs_payouts = True
 
             if needs_payouts:
                 return redirect(url_for('payouts'))
 
+            # Honor ?next= if safe
             next_url = request.args.get("next")
             if next_url and is_safe_url(next_url):
                 return redirect(next_url)
+
             return redirect(url_for('index'))
 
         flash('Invalid email or password.')
@@ -231,15 +204,23 @@ def dashboard():
     tickets = Ticket.query.filter_by(user_id=current_user.id).all()
 
     if form.validate_on_submit():
+        # Read slider value and clamp 5–20
         raw = request.form.get('fee_percent_override', '12')
         try:
             pct = float(raw)
         except (TypeError, ValueError):
             pct = 12.0
         pct = max(5.0, min(20.0, pct))
+
+        # Persist the chosen fee on the user (you can also choose to store per-ticket)
         current_user.fee_percent = pct
 
-        t = Ticket(name=form.name.data, price=form.price.data, user_id=current_user.id)
+        # Create the ticket
+        t = Ticket(
+            name=form.name.data,
+            price=form.price.data,
+            user_id=current_user.id
+        )
         db.session.add(t)
         db.session.commit()
         flash("Ticket added.")
@@ -251,7 +232,11 @@ def dashboard():
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
-    # TONIGHT: do NOT force Stripe Connect; fall back to platform charges if needed
+    # Gate: force payouts setup before accessing tickets/QR
+    if (not getattr(current_user, "stripe_account_id", None)
+            or not getattr(current_user, "charges_enabled", False)):
+        return redirect(url_for('payouts'))
+
     tickets = Ticket.query.filter_by(user_id=current_user.id).all()
     has_tickets = len(tickets) > 0
 
@@ -260,6 +245,7 @@ def index():
         if not ticket_id_raw:
             flash("Please select a ticket first.")
             return redirect(url_for('index'))
+
         try:
             ticket_id = int(ticket_id_raw)
         except (TypeError, ValueError):
@@ -271,67 +257,55 @@ def index():
             flash("Ticket not found or not yours.")
             return redirect(url_for('index'))
 
+        # ---------- Percent-based fee ----------
         base_price = float(sel.price)
         pct = sel.fee_percent or getattr(current_user, "fee_percent", 12.0)
         pct = max(5.0, min(20.0, float(pct)))
 
-        fee_total = base_price * (pct / 100.0)
-        total_price = base_price + fee_total
-        total_cents = int(round(total_price * 100))
+        fee_total = base_price * (pct / 100.0)    # total fee paid by customer
+        total_price = base_price + fee_total      # customer total
 
-        # Your original "half of fee" platform logic
-        platform_fee_cents = int(round((fee_total * 0.5) * 100))
+        # Stripe needs integer cents
+        total_cents = int(round(total_price * 100))
+        platform_fee_cents = int(round((fee_total * 0.5) * 100))  # your 50% of fee
+
+        # Safety: app fee can't exceed total
         platform_fee_cents = min(platform_fee_cents, max(total_cents - 1, 0))
 
         success_url = (
             "https://teameventlock.com/success"
             f"?ticket={quote_plus(sel.name)}&price={total_price:.2f}"
         )
-        cancel_url = url_for('index', _external=True)
 
         try:
-            if getattr(current_user, "stripe_account_id", None) and getattr(current_user, "charges_enabled", False):
-                # Connected account: split payout (same as before)
-                session = stripe.checkout.Session.create(
-                    mode='payment',
-                    line_items=[{
-                        'price_data': {
-                            'currency': 'usd',
-                            'product_data': {'name': sel.name},
-                            'unit_amount': total_cents,
-                        },
-                        'quantity': 1,
-                    }],
-                    success_url=success_url,
-                    cancel_url=cancel_url,
-                    payment_intent_data={
-                        'application_fee_amount': platform_fee_cents,
-                        'transfer_data': {'destination': current_user.stripe_account_id},
-                        'on_behalf_of': current_user.stripe_account_id,
+            # Split via Connect: app fee to platform, rest to destination (connected account)
+            session = stripe.checkout.Session.create(
+                mode='payment',
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {'name': sel.name},
+                        'unit_amount': total_cents,
                     },
-                )
-                print(f"[INDEX] split Session {session.id} -> acct {current_user.stripe_account_id} total_cents={total_cents} fee_half_cents={platform_fee_cents} pct={pct}")
-            else:
-                # Not connected: route funds to platform (NO transfer_data / NO application_fee_amount)
-                session = stripe.checkout.Session.create(
-                    mode='payment',
-                    line_items=[{
-                        'price_data': {
-                            'currency': 'usd',
-                            'product_data': {'name': sel.name},
-                            'unit_amount': total_cents,
-                        },
-                        'quantity': 1,
-                    }],
-                    success_url=success_url,
-                    cancel_url=cancel_url,
-                )
-                print(f"[INDEX] platform Session {session.id} total_cents={total_cents} pct={pct} (no connect)")
+                    'quantity': 1,
+                }],
+                success_url=success_url,
+                cancel_url=request.host_url,
+                payment_intent_data={
+                    'application_fee_amount': platform_fee_cents,
+                    'transfer_data': {
+                        'destination': current_user.stripe_account_id,
+                    },
+                    'on_behalf_of': current_user.stripe_account_id,
+                },
+            )
+            print(f"[INDEX] Session {session.id} total_cents={total_cents} fee_half_cents={platform_fee_cents} pct={pct}")
         except Exception as e:
             print(f"[INDEX][StripeError] {e}")
             flash("Couldn’t start checkout with Stripe. Please try again.")
             return redirect(url_for('index'))
 
+        # Generate QR for the session URL
         try:
             qr = qrcode.make(session.url)
             buffered = io.BytesIO()
@@ -342,36 +316,53 @@ def index():
             flash("Failed to generate the QR code.")
             return redirect(url_for('index'))
 
-        return render_template('qrcode.html', img_data=img_str, ticket_name=sel.name, total_price=total_price)
+        return render_template(
+            'qrcode.html',
+            img_data=img_str,
+            ticket_name=sel.name,
+            total_price=total_price
+        )
 
-    return render_template('index.html', tickets=tickets, has_tickets=has_tickets)
+    # GET
+    return render_template(
+        'index.html',
+        tickets=tickets,
+        has_tickets=has_tickets
+    )
 
 # ------------------ Payouts (Stripe Connect onboarding) ------------------
 @app.route('/payouts')
 @login_required
 def payouts():
-    # Still viewable; not enforced in TONIGHT_MODE
     return render_template('payouts.html')
 
 # ------------------ Email confirmation routes ------------------
 @app.route("/confirm")
 @login_required
 def send_confirm():
-    # No-op tonight so nobody gets blocked
-    flash("Email confirmation is temporarily disabled — you're good to go.", "info")
+    if getattr(current_user, "is_confirmed", False):
+        flash("Your email is already confirmed.", "info")
+        return redirect(url_for("dashboard"))
+    try:
+        send_confirmation_email(current_user)
+        flash("Confirmation email sent. Check your inbox.", "success")
+    except Exception:
+        app.logger.exception("Failed to send confirmation email")
+        flash("Could not send confirmation email. Please try again.", "error")
     return redirect(url_for("dashboard"))
 
 @app.route("/confirm/<token>")
 @login_required
 def confirm_email(token):
-    # Kept for later; not used tonight
     uid = verify_confirm_token(token)
     if not uid or uid != current_user.id:
         flash("Invalid or expired confirmation link.", "error")
         return redirect(url_for("dashboard"))
-    if getattr(current_user, "email_confirmed_at", None):
+
+    if current_user.email_confirmed_at:
         flash("Email already confirmed.", "info")
         return redirect(url_for("dashboard"))
+
     current_user.email_confirmed_at = datetime.now(dt_timezone.utc)
     db.session.commit()
     flash("Email confirmed! Thanks.", "success")
