@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Settings – Teameventlock{% endblock %}
+
+{% block extra_head %}
+  <style>
+    /* Don’t style <body>; scope to this page only */
+    .settings-page { min-height:70vh; display:flex; align-items:center; justify-content:center; }
+    .settings-container {
+      background-color:#1c1c1c; color:#fff;
+      padding:2rem; border-radius:10px; width:100%; max-width:420px; text-align:center;
+      box-shadow:0 10px 30px rgba(0,0,0,.5);
+    }
+    .settings-container h2 { margin:0 0 1rem; }
+    .settings-container p { color:#ccc; font-size:.95rem; margin:.25rem 0; }
+    a.button {
+      display:block; background:#ff6600; color:#fff; padding:.8rem; margin:.5rem 0;
+      border-radius:8px; text-decoration:none; font-weight:700;
+    }
+    a.button:hover { background:#e65c00; }
+    .logout-link { display:block; margin-top:1rem; color:#ccc; text-decoration:none; }
+    .logout-link:hover { color:#ff6600; }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="settings-page">
+    <div class="settings-container">
+      <h2>Profile</h2>
+
+      {# Use current_user directly (Flask-Login) or keep `user` if you pass it in #}
+      <p><strong>Name:</strong> {{ (user.name if user is defined else current_user.name) or '—' }}</p>
+      <p><strong>Email:</strong> {{ (user.email if user is defined else current_user.email) }}</p>
+
+      <!-- Change Stripe account (re-runs onboarding flow) -->
+      <a href="{{ stripe_connect_link or url_for('payouts') }}" class="button">Change Stripe Account</a>
+
+      <!-- Back to tickets/QR -->
+      <a href="{{ url_for('index') }}" class="button">Go to Tickets / QR</a>
+
+      <!-- Logout -->
+      <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+    </div>
+  </div>
+{% endblock %}

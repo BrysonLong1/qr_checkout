@@ -1,65 +1,89 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Select Your Ticket</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+
+{% block title %}Select Your Ticket – Teameventlock{% endblock %}
+
+{% block extra_head %}
   <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-black text-white min-h-screen flex items-center justify-center">
-  <div class="w-full max-w-md p-6 bg-gray-900 rounded-xl shadow-lg text-center space-y-6 animate-fade-in">
-    <img src="{{ url_for('static', filename='fxbgnew.png') }}" alt="FXBG Summers Logo" class="mx-auto w-64 mb-4 animate-fade-in-up">
-
-    <h2 class="text-2xl font-bold">Select Your Ticket</h2>
-
-    {% if has_tickets %}
-      <!-- Plus/Add Tickets (above dropdown) -->
-      <div class="flex justify-center">
-        <a href="{{ url_for('dashboard') }}"
-           class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white text-black font-semibold hover:opacity-90 transition">
-          <span class="text-xl leading-none">+</span>
-          <span>Add Tickets</span>
-        </a>
-      </div>
-
-      <form method="POST" class="space-y-4 mt-2">
-        <!-- CSRF for non-WTForms POST -->
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        <select name="ticket_id" required class="w-full px-4 py-2 rounded-md bg-white text-black">
-          <option value="" disabled selected>— Select a ticket —</option>
-          {% for t in tickets %}
-            {% set base = t.price %}
-            {% set total = (base + (service_fee or 3.50)) %}
-            <option value="{{ t.id }}">
-              {{ t.name }} — ${{ '%.2f' % base }} (Total: ${{ '%.2f' % total }})
-            </option>
-          {% endfor %}
-        </select>
-
-        <p class="text-xs text-gray-400">
-          Total includes a ${{ '%.2f' % (service_fee or 3.50) }} platform fee.
-        </p>
-
-        <button type="submit"
-                class="w-full py-2 bg-gradient-to-r from-orange-500 to-pink-600 text-white font-semibold rounded-md hover:opacity-90 transition">
-          Generate QR Code
-        </button>
-      </form>
-    {% else %}
-      <p class="text-red-400">No tickets yet. You must add at least one ticket to continue.</p>
-      <a href="{{ url_for('dashboard') }}"
-         class="inline-block mt-2 px-4 py-2 rounded-md bg-white text-black font-semibold hover:opacity-90 transition">
-        + Add Tickets
-      </a>
-    {% endif %}
-  </div>
-
   <style>
-    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-fade-in { animation: fade-in 1s ease-out both; }
-    .animate-fade-in-up { animation: fade-in-up 1s ease-out both; }
+    @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes fade-in-up { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+    .animate-fade-in { animation: fade-in 1s ease-out both }
+    .animate-fade-in-up { animation: fade-in-up 1s ease-out both }
   </style>
-</body>
-</html>
+{% endblock %}
+
+{% block content %}
+  <div class="min-h-[70vh] flex items-center justify-center text-white">
+    <div class="w-full max-w-md p-6 bg-gray-900 rounded-xl shadow-lg text-center space-y-6 animate-fade-in">
+      <img src="{{ url_for('static', filename='thelogo.png') }}" alt="FXBG Summers Logo"
+           class="mx-auto w-64 mb-4 animate-fade-in-up" />
+
+      <h2 class="text-2xl font-bold">Select Your Ticket</h2>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="bg-red-600/20 text-red-200 p-3 rounded">
+            {% for m in messages %}<div>{{ m }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% if has_tickets %}
+        <div class="flex justify-center">
+          <a href="{{ url_for('dashboard') }}"
+             class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white text-black font-semibold hover:opacity-90 transition">
+            <span class="text-xl leading-none">+</span>
+            <span>Add Tickets</span>
+          </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('index') }}" class="space-y-4 mt-2" id="qrForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+          <select name="ticket_id" required class="w-full px-4 py-2 rounded-md bg-white text-black" id="ticketSelect">
+            <option value="" disabled selected>— Select a ticket —</option>
+
+            {% for t in tickets %}
+              {# choose ticket fee if present, else user's #}
+              {% set raw_pct = (t.fee_percent if t.fee_percent is not none else (current_user.fee_percent if current_user.fee_percent is not none else 12.0)) %}
+              {% if raw_pct < 5.0 %}{% set raw_pct = 5.0 %}{% endif %}
+              {% if raw_pct > 20.0 %}{% set raw_pct = 20.0 %}{% endif %}
+              {% set pct   = raw_pct %}
+              {% set base  = t.price | float %}
+              {% set fee   = (base * pct / 100.0) %}
+              {% set total = (base + fee) %}
+              <option value="{{ t.id }}">
+                {{ t.name }} — Base ${{ '%.2f' % base }} • Fee {{ '%.1f' % pct }}% (${{ '%.2f' % fee }}) • Total ${{ '%.2f' % total }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <p class="text-xs text-gray-400">
+            You set the fee (5–20%). We split the fee 50/50 with you. Total shown includes your chosen fee.
+          </p>
+
+          <button type="submit"
+                  class="w-full py-2 bg-gradient-to-r from-orange-500 to-pink-600 text-white font-semibold rounded-md hover:opacity-90 transition">
+            Generate QR Code
+          </button>
+        </form>
+
+        <script>
+          document.getElementById('qrForm').addEventListener('submit', (e) => {
+            const sel = document.getElementById('ticketSelect');
+            if (!sel.value) {
+              e.preventDefault();
+              alert('Please select a ticket first.');
+            }
+          });
+        </script>
+      {% else %}
+        <p class="text-red-400">No tickets yet. You must add at least one ticket to continue.</p>
+        <a href="{{ url_for('dashboard') }}"
+           class="inline-block mt-2 px-4 py-2 rounded-md bg-white text-black font-semibold hover:opacity-90 transition">
+          + Add Tickets
+        </a>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

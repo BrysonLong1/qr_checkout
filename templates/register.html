@@ -1,66 +1,120 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Create Account</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="w-full max-w-md p-8 bg-white rounded-xl shadow-md space-y-6">
-        <h2 class="text-2xl font-bold text-center text-gray-800">Create Account</h2>
+{% extends "base.html" %}
 
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="space-y-2">
-                    {% for message in messages %}
-                        <p class="text-red-500 text-sm text-center">{{ message }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+{% block title %}Register – Teameventlock{% endblock %}
 
-        <form method="POST" id="registerForm" class="space-y-4">
-            {{ form.hidden_tag() }}
+{% block extra_head %}
+  <style>
+    :root {
+      --bg:#000; --card:#111; --text:#fff; --muted:#b3b3b3;
+      --error:#ff6b6b; --ok:#31d0aa; --btn-grad: linear-gradient(90deg, orange, deeppink);
+      --radius:14px;
+    }
+    .reg-wrap{ min-height:70vh; display:grid; place-items:center; padding:24px; }
+    .card{
+      width:100%; max-width:420px; background:var(--card); color:var(--text);
+      padding:28px; border-radius:var(--radius); box-shadow:0 10px 30px rgba(0,0,0,.5); text-align:center;
+    }
+    .logo{ width:220px; max-width:80%; display:block; margin:0 auto 10px; }
+    h1{ font-size:26px; margin:8px 0 6px; font-weight:700; }
+    .desc{ font-size:14px; color:var(--muted); margin:0 0 18px; line-height:1.4; }
 
-            <input type="email" name="email" placeholder="Email"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+    .field{ text-align:left; margin:12px 0 4px; }
+    label{ display:inline-block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input[type="email"], input[type="password"]{
+      width:100%; padding:12px 14px; border:1px solid #2a2a2a; border-radius:10px;
+      background:#0b0b0b; color:var(--text); font-size:16px; outline:none;
+    }
+    input[type="email"]:focus, input[type="password"]:focus{ border-color:#5a5a5a; }
 
-            <input type="password" name="password" id="password" placeholder="Password"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+    .btn{
+      width:100%; display:inline-block; margin-top:14px; padding:12px 16px; border-radius:10px; border:none;
+      background:var(--btn-grad); color:#fff; font-weight:700; font-size:16px; cursor:pointer;
+    }
+    .btn:active{ transform:translateY(1px); }
 
-            <input type="password" name="confirm" id="confirm_password" placeholder="Confirm Password"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+    .flash{ margin-top:12px; background:#1a0000; border:1px solid #330000; color:#ffb3b3;
+      border-radius:10px; padding:10px 12px; text-align:left; }
 
-            <button type="submit"
-                    class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">
-                Create Account
-            </button>
-        </form>
+    .feedback{ font-size:12px; margin-top:6px; }
+    .feedback.err{ color:var(--error); }
+    .feedback.ok{ color:var(--ok); }
 
-        <p class="text-sm text-center mt-2" id="feedback"></p>
+    .login-note{ margin-top:14px; font-size:14px; color:var(--muted); }
+    .login-note a{ color:deeppink; text-decoration:underline; }
+  </style>
+{% endblock %}
 
-        <p class="text-sm text-center mt-4 text-gray-600">
-            Already have an account? <a href="{{ url_for('login') }}" class="text-blue-600 hover:underline">Login</a>
-        </p>
+{% block content %}
+  <div class="reg-wrap">
+    <div class="card">
+      <img class="logo" src="{{ url_for('static', filename='thelogo.png') }}" alt="Teameventlock" />
+      <h1>Create Account</h1>
+      <p class="desc">One account for tickets, payouts, and your dashboard.</p>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="flash">
+            {% for message in messages %}
+              <div>{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" id="registerForm" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+          <label for="email">Email</label>
+          {{ form.email(id="email", type="email", placeholder="you@example.com", autocomplete="email") }}
+          {% if form.email.errors %}<div class="feedback err">{{ form.email.errors[0] }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          {{ form.password(id="password", type="password", placeholder="••••••••", autocomplete="new-password") }}
+          {% if form.password.errors %}<div class="feedback err">{{ form.password.errors[0] }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="confirm">Confirm Password</label>
+          {{ form.confirm(id="confirm", type="password", placeholder="Repeat password", autocomplete="new-password") }}
+          {% if form.confirm.errors %}<div class="feedback err">{{ form.confirm.errors[0] }}</div>{% endif %}
+          <div id="pwFeedback" class="feedback"></div>
+        </div>
+
+        {{ form.submit(class_="btn", value="Create Account") }}
+      </form>
+
+      <p class="login-note">
+        Already have an account?
+        <a href="{{ url_for('login') }}">Log in</a>
+      </p>
     </div>
+  </div>
 
-    <script>
-        const form = document.getElementById("registerForm");
-        const password = document.getElementById("password");
-        const confirmPassword = document.getElementById("confirm_password");
-        const feedback = document.getElementById("feedback");
+  <script>
+    (function () {
+      const form = document.getElementById('registerForm');
+      const pw = document.getElementById('password');
+      const cf = document.getElementById('confirm');
+      const fb = document.getElementById('pwFeedback');
 
-        form.addEventListener("submit", function (e) {
-            if (password.value !== confirmPassword.value) {
-                e.preventDefault();
-                feedback.textContent = "❌ Passwords don't match.";
-                feedback.className = "text-red-500 text-sm text-center";
-            } else {
-                feedback.textContent = "✅ Passwords match!";
-                feedback.className = "text-green-500 text-sm text-center";
-            }
-        });
-    </script>
-</body>
-</html>
+      function check() {
+        if (!pw.value && !cf.value) { fb.textContent = ''; fb.className = 'feedback'; return; }
+        if (pw.value === cf.value) {
+          fb.textContent = '✓ Passwords match';
+          fb.className = 'feedback ok';
+          return true;
+        } else {
+          fb.textContent = '✗ Passwords do not match';
+          fb.className = 'feedback err';
+          return false;
+        }
+      }
+      pw.addEventListener('input', check);
+      cf.addEventListener('input', check);
+      form.addEventListener('submit', function (e) { if (!check()) e.preventDefault(); });
+    })();
+  </script>
+{% endblock %}

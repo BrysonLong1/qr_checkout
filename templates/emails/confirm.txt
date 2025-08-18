@@ -1,0 +1,11 @@
+Hi {{ user.email }},
+
+Please confirm your email address for Teameventlock.
+
+Verify here:
+{{ confirm_url }}
+
+If you didn’t request this, you can safely ignore this message.
+
+Thanks,
+Teameventlock

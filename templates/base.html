@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Open Graph / Facebook -->
+  <meta property="og:title" content="Teameventlock" />
+  <meta property="og:description" content="Secure your tickets and manage payouts with ease." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://teameventlock.com/" />
+  <meta property="og:image" content="https://teameventlock.com/static/share.png" />
+
+<!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Teameventlock" />
+  <meta name="twitter:description" content="Secure your tickets and manage payouts with ease." />
+  <meta name="twitter:image" content="https://teameventlock.com/static/share.png" />
+
+
+	
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Teameventlock{% endblock %}</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root{--bg:#000;--card:#111;--text:#fff;--muted:#b3b3b3;--accent:deeppink}
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+      padding:10px 14px;background:#0a0a0a;border-bottom:1px solid #1e1e1e}
+    .brand{display:flex;gap:10px;align-items:center}
+    .brand img{height:28px}
+    .brand span{font-weight:700;letter-spacing:.3px}
+    .right{display:flex;gap:10px;align-items:center}
+    .chip{font-size:12px;color:var(--muted)}
+    .btn-link{color:#fff;text-decoration:none;padding:8px 10px;border-radius:10px;background:#1b1b1b;white-space:nowrap}
+    .btn-link:hover{background:#262626}
+    .btn-primary{background:linear-gradient(90deg, orange, var(--accent))}
+    .btn-primary:hover{filter:brightness(1.05)}
+    .wrap{padding:16px}
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='thelogo.png') }}" alt="logo" />
+      <span>Teameventlock</span>
+    </div>
+
+    <!-- Desktop nav -->
+    <nav class="right hidden md:flex">
+      {% if current_user.is_authenticated %}
+        <span class="chip hidden lg:inline">Hi, {{ current_user.name or current_user.email }}</span>
+        <a class="btn-link" href="{{ url_for('index') }}">Tickets</a>
+        <a class="btn-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a class="btn-link" href="{{ url_for('payouts') }}">Payouts</a>
+        <a class="btn-link btn-primary" href="{{ url_for('settings') }}">Settings</a>
+        <a class="btn-link" href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a class="btn-link" href="{{ url_for('login') }}">Log in</a>
+        <a class="btn-link btn-primary" href="{{ url_for('register') }}">Register</a>
+      {% endif %}
+    </nav>
+
+    <!-- Mobile menu button -->
+    <button id="menuBtn" class="md:hidden inline-flex items-center justify-center p-2 rounded-lg bg-[#1b1b1b] hover:bg-[#262626]" aria-label="Open menu">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Mobile nav -->
+  <div id="mobileMenu" class="md:hidden hidden border-b border-[#1e1e1e] bg-[#0a0a0a]">
+    <div class="px-3 py-3 flex flex-col gap-2">
+      {% if current_user.is_authenticated %}
+        <span class="chip">Hi, {{ current_user.name or current_user.email }}</span>
+        <a class="btn-link" href="{{ url_for('index') }}">Tickets</a>
+        <a class="btn-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a class="btn-link" href="{{ url_for('payouts') }}">Payouts</a>
+        <a class="btn-link btn-primary text-black text-center" href="{{ url_for('settings') }}">Settings</a>
+        <a class="btn-link" href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a class="btn-link" href="{{ url_for('login') }}">Log in</a>
+        <a class="btn-link btn-primary text-black text-center" href="{{ url_for('register') }}">Register</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Content wrapper: fluid with safe max width + overflow guards -->
+  <main class="wrap mx-auto w-full max-w-6xl px-4 sm:px-6">
+    <div class="rounded-2xl border border-[#1e1e1e] bg-[var(--card)] p-4 sm:p-6">
+      <div class="min-w-0 overflow-x-auto"> <!-- prevents horizontal overflow on mobile -->
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const btn = document.getElementById('menuBtn');
+    const menu = document.getElementById('mobileMenu');
+    if (btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
